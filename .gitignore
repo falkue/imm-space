@@ -1,0 +1,12 @@
+# Interne Unterlagen (nicht öffentlich): Auftrag, Session-Regeln, Pläne und Fotos der Räume
+AUFTRAG.md
+CLAUDE.md
+opencode.json
+plaene/
+inventar/fotos-original/
+# Arbeitsdateien
+varianten/db/
+varianten/entwuerfe/*.svg
+varianten/entwuerfe/*.png
+node_modules/
+.DS_Store

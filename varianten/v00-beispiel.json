@@ -1,0 +1,149 @@
+{
+  "schema": "imm-space/variante@1",
+  "id": "v00-beispiel",
+  "name": "Beispiel (Platzhalter)",
+  "notiz": "Erste Testanordnung im Platzhalter-Raum.",
+  "raum": "v01-platzhalter",
+  "platzierungen": [
+    {
+      "uid": "p1",
+      "stueck": "ph-schreibtisch-160",
+      "x": 1.3,
+      "y": 1.6,
+      "rot": 180
+    },
+    {
+      "uid": "p2",
+      "stueck": "ph-schreibtisch-160",
+      "x": 3.0,
+      "y": 1.6,
+      "rot": 180
+    },
+    {
+      "uid": "p3",
+      "stueck": "ph-schreibtisch-160",
+      "x": 1.3,
+      "y": 2.4,
+      "rot": 0
+    },
+    {
+      "uid": "p4",
+      "stueck": "ph-schreibtisch-160",
+      "x": 3.0,
+      "y": 2.4,
+      "rot": 0
+    },
+    {
+      "uid": "p5",
+      "stueck": "ph-buerostuhl",
+      "x": 1.3,
+      "y": 0.9,
+      "rot": 0
+    },
+    {
+      "uid": "p6",
+      "stueck": "ph-buerostuhl",
+      "x": 3.0,
+      "y": 0.9,
+      "rot": 0
+    },
+    {
+      "uid": "p7",
+      "stueck": "ph-buerostuhl",
+      "x": 1.3,
+      "y": 3.1,
+      "rot": 180
+    },
+    {
+      "uid": "p8",
+      "stueck": "ph-buerostuhl",
+      "x": 3.0,
+      "y": 3.1,
+      "rot": 180
+    },
+    {
+      "uid": "p9",
+      "stueck": "ph-besprechung-240",
+      "x": 9.5,
+      "y": 2.2,
+      "rot": 0
+    },
+    {
+      "uid": "p10",
+      "stueck": "ph-stuhl",
+      "x": 8.8,
+      "y": 1.4,
+      "rot": 0
+    },
+    {
+      "uid": "p11",
+      "stueck": "ph-stuhl",
+      "x": 10.2,
+      "y": 1.4,
+      "rot": 0
+    },
+    {
+      "uid": "p12",
+      "stueck": "ph-stuhl",
+      "x": 8.8,
+      "y": 3.0,
+      "rot": 180
+    },
+    {
+      "uid": "p13",
+      "stueck": "ph-stuhl",
+      "x": 10.2,
+      "y": 3.0,
+      "rot": 180
+    },
+    {
+      "uid": "p14",
+      "stueck": "ph-sofa",
+      "x": 10.0,
+      "y": 7.55,
+      "rot": 180
+    },
+    {
+      "uid": "p15",
+      "stueck": "ph-sessel",
+      "x": 8.6,
+      "y": 6.2,
+      "rot": 270
+    },
+    {
+      "uid": "p16",
+      "stueck": "ph-schrank-hoch",
+      "x": 0.21,
+      "y": 5.0,
+      "rot": 270
+    },
+    {
+      "uid": "p17",
+      "stueck": "ph-schrank-hoch",
+      "x": 0.21,
+      "y": 6.0,
+      "rot": 270
+    },
+    {
+      "uid": "p18",
+      "stueck": "ph-pflanze",
+      "x": 11.6,
+      "y": 4.6,
+      "rot": 0
+    },
+    {
+      "uid": "p19",
+      "stueck": "ph-drucker",
+      "x": 5.0,
+      "y": 7.6,
+      "rot": 180
+    },
+    {
+      "uid": "p20",
+      "stueck": "ph-rundtisch-90",
+      "x": 6.0,
+      "y": 5.6,
+      "rot": 0
+    }
+  ]
+}

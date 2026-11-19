@@ -1,0 +1,23 @@
+{
+  "schema": "imm-space/katalog@1",
+  "fassung": "v01-platzhalter",
+  "stand": "2026-11-19",
+  "hinweis": "Platzhalter-Möbel bis die Fotos da sind. Masse in Metern: b = Breite (lokal x), t = Tiefe (lokal y, Vorderseite +y), h = Höhe. herkunft je Mass: gemessen | plan | geschaetzt. bild = Pfad relativ zur App (z. B. bilder/tisch-01.jpg) oder null.",
+  "typen": ["tisch", "rundtisch", "stuhl", "buerostuhl", "sofa", "sessel", "schrank", "regal", "sideboard", "rollcontainer", "geraet", "pflanze", "whiteboard"],
+  "stuecke": [
+    { "id": "ph-schreibtisch-160", "name": "Schreibtisch 160", "typ": "tisch", "b": 1.6, "t": 0.8, "h": 0.74, "farbe": "#d8c4a0", "material": "Eiche hell / Gestell weiss", "anzahl": 8, "bild": null, "herkunft": "geschaetzt", "platzhalter": true },
+    { "id": "ph-buerostuhl", "name": "Bürostuhl", "typ": "buerostuhl", "b": 0.65, "t": 0.65, "h": 1.05, "farbe": "#3a3f47", "material": "Netz schwarz", "anzahl": 10, "bild": null, "herkunft": "geschaetzt", "platzhalter": true },
+    { "id": "ph-besprechung-240", "name": "Besprechungstisch 240", "typ": "tisch", "b": 2.4, "t": 1.0, "h": 0.74, "farbe": "#efefea", "material": "weiss matt", "anzahl": 1, "bild": null, "herkunft": "geschaetzt", "platzhalter": true },
+    { "id": "ph-stuhl", "name": "Besucherstuhl", "typ": "stuhl", "b": 0.5, "t": 0.52, "h": 0.82, "farbe": "#c0392b", "material": "Kunststoff rot", "anzahl": 8, "bild": null, "herkunft": "geschaetzt", "platzhalter": true },
+    { "id": "ph-rundtisch-90", "name": "Stehtisch rund Ø 90", "typ": "rundtisch", "b": 0.9, "t": 0.9, "h": 1.1, "farbe": "#e9e4da", "material": "HPL hell", "anzahl": 2, "bild": null, "herkunft": "geschaetzt", "platzhalter": true },
+    { "id": "ph-sofa", "name": "Sofa 3-Sitzer", "typ": "sofa", "b": 2.1, "t": 0.9, "h": 0.8, "farbe": "#5b7083", "material": "Stoff blaugrau", "anzahl": 1, "bild": null, "herkunft": "geschaetzt", "platzhalter": true },
+    { "id": "ph-sessel", "name": "Sessel", "typ": "sessel", "b": 0.8, "t": 0.8, "h": 0.8, "farbe": "#8a6f4e", "material": "Leder cognac", "anzahl": 2, "bild": null, "herkunft": "geschaetzt", "platzhalter": true },
+    { "id": "ph-schrank-hoch", "name": "Aktenschrank hoch", "typ": "schrank", "b": 1.0, "t": 0.42, "h": 1.97, "farbe": "#dcdcd8", "material": "Metall lichtgrau", "anzahl": 4, "bild": null, "herkunft": "geschaetzt", "platzhalter": true },
+    { "id": "ph-regal", "name": "Regal offen", "typ": "regal", "b": 0.8, "t": 0.35, "h": 1.8, "farbe": "#f2f2f2", "material": "weiss", "anzahl": 3, "bild": null, "herkunft": "geschaetzt", "platzhalter": true },
+    { "id": "ph-sideboard", "name": "Sideboard", "typ": "sideboard", "b": 1.6, "t": 0.45, "h": 0.75, "farbe": "#b9a27f", "material": "Eiche", "anzahl": 2, "bild": null, "herkunft": "geschaetzt", "platzhalter": true },
+    { "id": "ph-rollcontainer", "name": "Rollcontainer", "typ": "rollcontainer", "b": 0.43, "t": 0.6, "h": 0.6, "farbe": "#dcdcd8", "material": "Metall lichtgrau", "anzahl": 8, "bild": null, "herkunft": "geschaetzt", "platzhalter": true },
+    { "id": "ph-drucker", "name": "Multifunktionsdrucker", "typ": "geraet", "b": 0.6, "t": 0.7, "h": 1.15, "farbe": "#6f7378", "material": "Kunststoff grau", "anzahl": 1, "bild": null, "herkunft": "geschaetzt", "platzhalter": true },
+    { "id": "ph-pflanze", "name": "Pflanze gross", "typ": "pflanze", "b": 0.6, "t": 0.6, "h": 1.6, "farbe": "#4f7d4a", "material": "Topf anthrazit", "anzahl": 3, "bild": null, "herkunft": "geschaetzt", "platzhalter": true },
+    { "id": "ph-whiteboard", "name": "Whiteboard mobil", "typ": "whiteboard", "b": 1.8, "t": 0.6, "h": 1.95, "farbe": "#fafafa", "material": "emailliert", "anzahl": 1, "bild": null, "herkunft": "geschaetzt", "platzhalter": true }
+  ]
+}
