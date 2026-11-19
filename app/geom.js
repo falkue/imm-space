@@ -188,6 +188,9 @@ function renderPlan(M, v, ctx) {
   const { u, interactive } = ctx, o = ctx.opts, R = M.R, out = [], piece = M.piece, hits = ctx.hits || new Map();
   const b = R.bounds;
   for (const z of R.zones) out.push(`<polygon points="${z.polygon.map(p => p.join(',')).join(' ')}" class="zone"/>`);
+  // Unterlage: eingescannter Plan als Bild (raum.unterlage = {bild, x, y, breite, hoehe, deckkraft}), Meter wie alles andere
+  const ul = M.raum?.unterlage;
+  if (ul?.bild && o.unterlage !== false) out.push(`<image href="${esc(ul.bild)}" x="${ul.x || 0}" y="${ul.y || 0}" width="${ul.breite}" height="${ul.hoehe}" preserveAspectRatio="none" opacity="${ul.deckkraft ?? .45}"/>`);
   if (o.grid) {
     const x0 = Math.floor(b.x0) - 1, x1 = Math.ceil(b.x1) + 1, y0 = Math.floor(b.y0) - 1, y1 = Math.ceil(b.y1) + 1, g = [];
     const step = ctx.k > 28 ? .5 : 1;

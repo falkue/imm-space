@@ -10,12 +10,20 @@
 //                                                         Planbild wie im Export (SVG, optional PNG über Chrome)
 //   node skripte/imm-layout.mjs db <v.json …> [--autor Fable] [--out varianten/db]
 //                                                         Dokumente für die Artifact-Datenbank (Sammlung "varianten")
+//   node skripte/imm-layout.mjs packen -o name.imm.json [--name "…"] [v.json …]
+//                                                         Projektdatei zum Weitergeben (Raum + Inventar mit Fotos + Varianten)
+//   node skripte/imm-layout.mjs entpacken name.imm.json [--out ordner]
+//                                                         Projektdatei in raum.json, katalog.json, varianten/*.json zerlegen
+//
+// Alle Befehle lesen statt raum/ und inventar/ auch eine Projektdatei: --projekt name.imm.json
+// (Varianten daraus mit pruefen/bild direkt per ID ansprechen: pruefen --projekt x.imm.json @alle bzw. @<id>).
 //
 // Exit-Code von "pruefen": 0 = ohne harte Befunde, 1 = Überschneidung, ausserhalb, unbekanntes Stück oder Bestand überschritten.
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
 import { dirname, join, basename, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execFileSync } from 'node:child_process';
+import { tmpdir } from 'node:os';
 import * as G from '../app/geom.js';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -24,9 +32,17 @@ const args = process.argv.slice(2), cmd = args.shift();
 const flag = (n, def = null) => { const i = args.indexOf(n); if (i < 0) return def; const v = args[i + 1]; args.splice(i, 2); return v; };
 const bool = n => { const i = args.indexOf(n); if (i < 0) return false; args.splice(i, 1); return true; };
 
-const raumPath = flag('--raum', join(root, 'raum/raeume.json'));
-const katPath = flag('--katalog', join(root, 'inventar/katalog.json'));
-const raum = readJSON(raumPath), kat = readJSON(katPath);
+const projPath = flag('--projekt');
+const proj = projPath ? readJSON(projPath) : null;
+if (proj && !String(proj.schema || '').startsWith('imm-space/projekt')) throw new Error(projPath + ': keine IMM-Projektdatei');
+const raum = proj ? proj.raum : readJSON(flag('--raum', join(root, 'raum/raeume.json')));
+const kat = proj ? proj.katalog : readJSON(flag('--katalog', join(root, 'inventar/katalog.json')));
+// "@alle" bzw. "@<id>" = Varianten aus der Projektdatei
+if (proj) for (let i = args.length - 1; i >= 0; i--) if (args[i].startsWith('@')) {
+  const sel = args[i] === '@alle' ? proj.varianten : proj.varianten.filter(v => v.id === args[i].slice(1));
+  const dir = join(tmpdir(), 'imm-aus-projekt'); mkdirSync(dir, { recursive: true });
+  args.splice(i, 1, ...sel.map(v => { const f = join(dir, v.id + '.json'); writeFileSync(f, JSON.stringify(v, null, 2)); return f; }));
+}
 const M = G.makeModel(raum, kat);
 
 function loadVariant(p) {
@@ -103,6 +119,22 @@ if (cmd === 'raum') {
     const f = join(outDir, v.id + '.json'); writeFileSync(f, JSON.stringify(doc, null, 2)); console.log(f);
   }
   console.log('Hochladen: ArtifactData batch, collection "varianten", doc_id = id, file_path = obige Dateien (bestehende Dokumente mit if_version).');
+} else if (cmd === 'packen') {
+  const out = flag('-o'); if (!out) throw new Error('-o name.imm.json fehlt');
+  const name = flag('--name', proj?.name || 'IMM-Räume');
+  const mime = { '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png', '.webp': 'image/webp', '.svg': 'image/svg+xml' };
+  const embed = rel => { if (!rel || rel.startsWith('data:')) return rel; for (const base of [join(root, 'app'), join(root, 'inventar'), root]) { const f = join(base, rel); if (existsSync(f)) return `data:${mime[f.slice(f.lastIndexOf('.')).toLowerCase()] || 'application/octet-stream'};base64,${readFileSync(f).toString('base64')}`; } console.error('Bild nicht gefunden: ' + rel); return rel; };
+  const k2 = structuredClone(kat); for (const st of k2.stuecke) st.bild = embed(st.bild);
+  const r2 = structuredClone(raum); if (r2.unterlage?.bild) r2.unterlage.bild = embed(r2.unterlage.bild);
+  const vs = args.length ? args.map(loadVariant) : (proj?.varianten || [loadVariant(join(root, 'varianten/v00-beispiel.json'))]);
+  const d = { schema: 'imm-space/projekt@1', id: G.esc(name).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''), name, gespeichert: new Date().toISOString(), programm: 'imm-layout.mjs', raum: r2, katalog: k2, varianten: vs };
+  writeFileSync(out, JSON.stringify(d, null, 1)); console.log(`${out}: ${vs.length} Varianten, ${k2.stuecke.length} Stücke`);
+} else if (cmd === 'entpacken') {
+  const src = readJSON(args[0]); const out = resolve(flag('--out', args[0].replace(/(\.imm)?\.json$/, '')));
+  mkdirSync(join(out, 'varianten'), { recursive: true });
+  writeFileSync(join(out, 'raum.json'), JSON.stringify(src.raum, null, 2)); writeFileSync(join(out, 'katalog.json'), JSON.stringify(src.katalog, null, 2));
+  for (const v of src.varianten || []) writeFileSync(join(out, 'varianten', (v.id || 'variante') + '.json'), JSON.stringify(v, null, 2));
+  console.log(`${out}: raum.json, katalog.json, ${(src.varianten || []).length} Varianten`);
 } else {
   console.log(readFileSync(fileURLToPath(import.meta.url), 'utf8').split('\n').filter(l => l.startsWith('//')).map(l => l.slice(3)).join('\n'));
   process.exit(cmd ? 2 : 0);

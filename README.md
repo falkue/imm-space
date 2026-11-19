@@ -7,9 +7,10 @@ Neugestaltung der Räume des Instituts für Marketing Management (IMM, ZHAW): 2D
 
 ## Editor
 - Code öffentlich: https://github.com/falkue/imm-space (ohne Pläne, Fotos, Auftrag – siehe `.gitignore`).
-- Zusammenarbeit mit Claude Code und Fable (Brainstorm, Prüfen, Anzeigen): `ZUSAMMENARBEIT.md`.
+- Zusammenarbeit mit Claude Code und Fable (Brainstorm, Prüfen, Anzeigen) und Projektdateien `*.imm.json`: `ZUSAMMENARBEIT.md`.
+- Offline-Fassung für Kolleginnen und Kollegen (eine HTML-Datei, Doppelklick): `dist/imm-raumplaner.html`.
 - Live (privat): https://claude.ai/artifact/1ot2JpSnj6C5Nz8rCWyHj8 – „IMM Raumplaner“, läuft im Browser (auch iPad), ohne Installation.
-- Quelle: `app/index.html` (SVG-2D-Editor, three.js 0.160 für 3D, jsPDF für den PDF-Export).
+- Quelle: `app/src/index.src.html` + `app/geom.js`, gebaut mit `node skripte/build.mjs` zu `app/index.html` (SVG-2D, three.js 0.160, jsPDF).
 - Veröffentlicht mit den Daten als Begleitdateien: `daten/raum.json` ← `raum/raeume.json`, `daten/katalog.json` ← `inventar/katalog.json`,
   `daten/beispiel.json` ← `varianten/v00-beispiel.json`.
 - Varianten liegen in der Artifact-Datenbank, Sammlung `varianten` (ein Dokument je Variante). Claude liest und schreibt sie mit `ArtifactData`.

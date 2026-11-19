@@ -120,6 +120,7 @@ aside#cat{background:var(--panel);border:1px solid var(--line);border-radius:var
 .state.good{color:var(--ok)}
 
 /* 3D */
+#fov{width:90px;accent-color:var(--accent)} #fovv{font-family:var(--f-mono);font-size:11.5px;min-width:30px}
 #walkpad{position:absolute;right:10px;bottom:28px;display:grid;grid-template-columns:repeat(3,44px);grid-template-rows:repeat(2,44px);gap:4px;z-index:6}
 #walkpad button{background:var(--panel);border:1px solid var(--line);border-radius:8px;font-size:18px;touch-action:none}
 #msg3d{position:absolute;inset:0;display:grid;place-items:center;color:var(--muted);font-size:13px;text-align:center;padding:20px}
@@ -128,6 +129,8 @@ aside#cat{background:var(--panel);border:1px solid var(--line);border-radius:var
 footer{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--muted);align-items:center;min-width:0}
 footer b{color:var(--ink);font-weight:500;font-variant-numeric:tabular-nums}
 footer .bad b{color:var(--warn)}
+footer .pf{display:inline-flex;gap:6px;align-items:center} footer .warn{color:var(--warn)}
+.dropzone::after{content:'Projektdatei hier loslassen';position:fixed;inset:12px;border:3px dashed var(--accent);border-radius:14px;background:color-mix(in srgb,var(--accent-weak) 80%,transparent);display:grid;place-items:center;font-size:20px;font-weight:600;color:var(--accent);z-index:95;pointer-events:none}
 .dot{width:7px;height:7px;border-radius:50%;background:var(--muted);display:inline-block;margin-right:5px}
 .dot.on{background:var(--ok)}
 
@@ -222,17 +225,21 @@ textarea.json{width:100%;min-height:260px;font-family:var(--f-mono);font-size:12
       <button data-layout="2d">2D</button><button data-layout="split">2D + 3D</button><button data-layout="3d">3D</button>
     </div>
     <div class="menu">
-      <button class="btn" id="btnExport" aria-haspopup="true">Export</button>
+      <button class="btn" id="btnExport" aria-haspopup="true">Datei</button>
       <div class="menu-pop" id="popExport" hidden>
+        <button data-x="open">Projekt öffnen …</button>
+        <button data-x="save">Projekt speichern (.imm.json)</button>
+        <hr>
         <button data-x="png">Plan als PNG</button>
         <button data-x="pdf">Plan als PDF (A4 quer, massstäblich)</button>
         <hr>
         <button data-x="json">Variante als JSON</button>
         <button data-x="jsonall">Alle Varianten als JSON</button>
-        <button data-x="import">JSON importieren …</button>
+        <button data-x="import">Varianten importieren …</button>
       </div>
     </div>
     <input type="file" id="fileImport" accept=".json,application/json" hidden>
+    <input type="file" id="fileProject" accept=".json,application/json" hidden>
   </header>
 
   <main>
@@ -249,6 +256,7 @@ textarea.json{width:100%;min-height:260px;font-family:var(--f-mono);font-size:12
       <div class="pane" id="pane2d">
         <svg id="plan" class="plan" xmlns="http://www.w3.org/2000/svg" aria-label="Grundriss 2D"></svg>
         <div class="float tl">
+          <button class="chip" data-opt="unterlage" hidden>Plan</button>
           <button class="chip" data-opt="grid">Raster</button>
           <button class="chip" data-opt="dims">Masse</button>
           <button class="chip" data-opt="swing">Türschwenk</button>
@@ -484,6 +492,9 @@ function renderPlan(M, v, ctx) {
   const { u, interactive } = ctx, o = ctx.opts, R = M.R, out = [], piece = M.piece, hits = ctx.hits || new Map();
   const b = R.bounds;
   for (const z of R.zones) out.push(`<polygon points="${z.polygon.map(p => p.join(',')).join(' ')}" class="zone"/>`);
+  // Unterlage: eingescannter Plan als Bild (raum.unterlage = {bild, x, y, breite, hoehe, deckkraft}), Meter wie alles andere
+  const ul = M.raum?.unterlage;
+  if (ul?.bild && o.unterlage !== false) out.push(`<image href="${esc(ul.bild)}" x="${ul.x || 0}" y="${ul.y || 0}" width="${ul.breite}" height="${ul.hoehe}" preserveAspectRatio="none" opacity="${ul.deckkraft ?? .45}"/>`);
   if (o.grid) {
     const x0 = Math.floor(b.x0) - 1, x1 = Math.ceil(b.x1) + 1, y0 = Math.floor(b.y0) - 1, y1 = Math.ceil(b.y1) + 1, g = [];
     const step = ctx.k > 28 ? .5 : 1;
@@ -641,7 +652,7 @@ const vid = () => 'v' + Date.now().toString(36) + Math.random().toString(36).sli
 const S = {
   raum: null, R: null, kat: null, byId: {},
   variants: {}, curId: null, sel: null,
-  view: { k: 50, tx: 0, ty: 0 }, opts: { grid: true, dims: true, swing: true, labels: true, snap: true },
+  view: { k: 50, tx: 0, ty: 0 }, opts: { grid: true, dims: true, swing: true, labels: true, snap: true, unterlage: true }, projekt: { id: 'imm', name: 'IMM-Räume', quelle: 'artifact' }, unsaved: false,
   undo: [], redo: [], hits: new Map(), layout: 'split', dragging: false,
   store: 'pending', saveState: '', storeErr: ''
 };
@@ -879,15 +890,17 @@ function renderStatus() {
   const v = cur(); if (!v) return;
   const n = v.platzierungen.length, hits = S.hits.size;
   const est = (S.raum.waende || []).every(w => w.herkunft === 'geschaetzt');
-  const storeTxt = { db: 'Varianten geteilt gespeichert', local: 'Varianten nur in diesem Browser', pending: 'Speicher wird verbunden …' }[S.store];
+  const storeTxt = { db: 'Varianten geteilt gespeichert', local: 'Varianten nur in diesem Browser', pending: 'Speicher wird verbunden …', datei: `Projektdatei ${S.projekt.datei || S.projekt.name}` }[S.store];
+  const pf = S.store === 'datei' ? `<span class="pf">${S.unsaved ? '<b class="warn">ungesicherte Änderungen</b>' : ''}<button class="btn" data-pf="save">Projekt speichern</button>${S.defaultSrc ? `<button class="btn" data-pf="home">Zurück zu ${esc(S.defaultName)}</button>` : ''}</span>` : '';
   $('#status').innerHTML = `<span><b>${n}</b> Stücke gesetzt</span>
     <span class="${hits ? 'bad' : ''}"><b>${hits}</b> mit Überschneidung</span>
     <span>Fläche <b>${num(S.R.area, 1)} m²</b></span>
     <span>Raum: ${esc(S.raum.name)} (${esc(S.raum.fassung)}${est ? ', Masse geschätzt' : ''})</span>
     <span class="grow"></span>
-    <span title="${esc(S.storeErr)}"><i class="dot ${S.store === 'db' ? 'on' : ''}"></i>${storeTxt}${S.saveState ? ' · ' + S.saveState : ''}</span>`;
+    <span title="${esc(S.storeErr)}"><i class="dot ${S.store === 'db' ? 'on' : ''}"></i>${storeTxt}${S.saveState ? ' · ' + S.saveState : ''}</span>${pf}`;
   $('#btnUndo').disabled = !S.undo.length; $('#btnRedo').disabled = !S.redo.length;
 }
+$('#status').addEventListener('click', e => { const b = e.target.closest('[data-pf]'); if (!b) return; if (b.dataset.pf === 'save') saveProject(); if (b.dataset.pf === 'home') goHome(); });
 $('#btnUndo').addEventListener('click', undo); $('#btnRedo').addEventListener('click', redo);
 
 /* ---------- Optionen, Layout ---------- */
@@ -932,7 +945,8 @@ const slug = s => s.toLowerCase().replace(/ä/g, 'ae').replace(/ö/g, 'oe').repl
 /* ---------- Varianten: Speicher ---------- */
 function kennzahlen(v) { const a = G.analyse(S.M, v); return { stuecke: a.stuecke, arbeitsplaetze: a.arbeitsplaetze, sitzplaetze: a.sitzplaetze, belegung_prozent: a.belegung_prozent, ueberschneidungen: a.ueberschneidungen.length, enge: a.enge.length }; }
 const COL = 'varianten';
-let db = null; const saveTimers = {};
+const LKEY = () => 'imm-varianten:' + S.projekt.id;
+let db = null, unsub = null; const saveTimers = {};
 const clean = v => ({ schema: 'imm-space/variante@1', id: v.id, name: v.name, notiz: v.notiz || '', autor: v.autor || 'Falk', begruendung: v.begruendung || '', basis: v.basis || null, tags: v.tags || [], raum: S.raum.fassung, katalog: S.kat.fassung, updated: v.updated || Date.now(), kennzahlen: kennzahlen(v),
   platzierungen: v.platzierungen.map(p => ({ uid: p.uid, stueck: p.stueck, x: f3(p.x), y: f3(p.y), rot: Math.round(p.rot * 1000) / 1000 })) });
 function saveSoon(v) {
@@ -946,14 +960,14 @@ async function persist(v) {
   if (S.store === 'db') {
     try { await db.collection(COL).doc(v.id).set(clean(v)); v.dirty = false; S.saveState = 'gespeichert'; S.storeErr = ''; }
     catch (e) { S.saveState = 'Speichern fehlgeschlagen'; S.storeErr = e?.message || e?.code || ''; if (e?.code === 'not_granted' || e?.code === 'permission_denied') S.saveState = 'nur Lesen'; }
-  } else { saveLocal(); v.dirty = false; S.saveState = 'gespeichert'; }
+  } else { saveLocal(); v.dirty = false; S.saveState = S.store === 'datei' ? 'im Browser zwischengespeichert' : 'gespeichert'; if (S.store === 'datei') S.unsaved = true; }
   renderStatus();
 }
-function saveLocal() { try { localStorage.setItem('imm-varianten', JSON.stringify(Object.values(S.variants).map(clean))); } catch { S.saveState = 'Browser-Speicher nicht verfügbar'; } }
+function saveLocal() { try { localStorage.setItem(LKEY(), JSON.stringify(Object.values(S.variants).map(clean))); } catch { S.saveState = 'Browser-Speicher nicht verfügbar'; } }
 async function removeVariant(id) {
   delete S.variants[id]; clearTimeout(saveTimers[id]);
   if (S.store === 'db') { try { await db.collection(COL).doc(id).delete(); } catch (e) { toast('Löschen fehlgeschlagen: ' + (e?.message || e?.code)); } }
-  else saveLocal();
+  else { saveLocal(); if (S.store === 'datei') S.unsaved = true; }
   if (S.curId === id) switchTo(sorted()[0]?.id || newVariant('Variante A', []).id);
   renderVarSelect();
 }
@@ -986,15 +1000,16 @@ async function connectStore(prefCur) {
   db = await use('db');
   if (!db) {
     S.store = 'local';
-    let arr = null; try { arr = JSON.parse(localStorage.getItem('imm-varianten') || 'null'); } catch { }
+    let arr = null; try { arr = JSON.parse(localStorage.getItem(LKEY()) || 'null'); } catch { }
     if (arr?.length) { for (const v of arr) S.variants[v.id] = v; }
     else if (S.beispiel) { const v = newVariant(S.beispiel.name, S.beispiel.platzierungen, S.beispiel.notiz); v.id = S.beispiel.id; S.variants = { [v.id]: v }; }
     finishConnect(prefCur); return;
   }
   let first = true;
   const timer = setTimeout(() => { if (first) { S.saveState = 'Speicher antwortet nicht'; renderStatus(); } }, 10000);
-  db.collection(COL).onSnapshot(snap => {
+  unsub?.(); unsub = db.collection(COL).onSnapshot(snap => {
     clearTimeout(timer);
+    if (S.projekt.quelle !== 'artifact') return;
     const seen = new Set();
     for (const d of snap.docs) {
       const data = d.data(); if (!data) continue; seen.add(d.id);
@@ -1109,6 +1124,8 @@ pop.addEventListener('click', async e => {
   if (b.dataset.x === 'json') await saveFile(`imm-variante-${slug(v.name)}-${stamp}.json`, JSON.stringify(clean(v), null, 2));
   if (b.dataset.x === 'jsonall') await saveFile(`imm-varianten-${stamp}.json`, JSON.stringify({ schema: 'imm-space/varianten@1', raum: S.raum.fassung, katalog: S.kat.fassung, varianten: sorted().map(clean) }, null, 2));
   if (b.dataset.x === 'import') $('#fileImport').click();
+  if (b.dataset.x === 'open') $('#fileProject').click();
+  if (b.dataset.x === 'save') await saveProject();
   if (b.dataset.x === 'png') { toast('Plan wird gezeichnet …'); const r = await rasterPlan(v); await saveFile(`imm-plan-${slug(v.name)}-${stamp}.png`, r.blob); }
   if (b.dataset.x === 'pdf') {
     toast('PDF wird erstellt …');
@@ -1121,25 +1138,29 @@ pop.addEventListener('click', async e => {
     } catch (err) { toast('PDF nicht möglich: ' + (err?.message || err)); }
   }
 });
+function importVariants(data) {
+  const list = Array.isArray(data.varianten) ? data.varianten : [data];
+  let last = null, unknown = 0;
+  for (const d of list) {
+    if (!Array.isArray(d.platzierungen)) throw new Error('keine "platzierungen" gefunden');
+    const pl = d.platzierungen.filter(p => typeof p.x === 'number' && typeof p.y === 'number' && p.stueck).map(p => ({ uid: p.uid || uid(), stueck: String(p.stueck), x: p.x, y: p.y, rot: +p.rot || 0 }));
+    unknown += pl.filter(p => !S.byId[p.stueck]).length;
+    const exists = Object.values(S.variants).some(v => v.name === d.name);
+    last = newVariant((d.name || 'Import') + (exists ? ' (Import)' : ''), pl, d.notiz || '');
+    Object.assign(last, { autor: d.autor, begruendung: d.begruendung, tags: d.tags, basis: d.basis });
+    last.dirty = true; saveSoon(last);
+  }
+  switchTo(last.id); toast(`${list.length} Variante(n) importiert${unknown ? ` · ${unknown} Stücke nicht im Katalog` : ''}`);
+  $$('.ovl').forEach(o => o.remove());
+}
 $('#fileImport').addEventListener('change', async e => {
   const f = e.target.files[0]; e.target.value = ''; if (!f) return;
-  try {
-    const data = JSON.parse(await f.text());
-    const list = Array.isArray(data.varianten) ? data.varianten : [data];
-    let last = null, unknown = 0;
-    for (const d of list) {
-      if (!Array.isArray(d.platzierungen)) throw new Error('keine "platzierungen" gefunden');
-      const pl = d.platzierungen.filter(p => typeof p.x === 'number' && typeof p.y === 'number' && p.stueck).map(p => ({ uid: p.uid || uid(), stueck: String(p.stueck), x: p.x, y: p.y, rot: +p.rot || 0 }));
-      unknown += pl.filter(p => !S.byId[p.stueck]).length;
-      const exists = Object.values(S.variants).some(v => v.name === d.name);
-      last = newVariant((d.name || 'Import') + (exists ? ' (Import)' : ''), pl, d.notiz || ''); last.dirty = true; saveSoon(last);
-    }
-    switchTo(last.id); toast(`${list.length} Variante(n) importiert${unknown ? ` · ${unknown} Stücke nicht im Katalog` : ''}`);
-    $$('.ovl').forEach(o => o.remove());
-  } catch (err) { toast('Import fehlgeschlagen: ' + err.message); }
+  try { const d = JSON.parse(await f.text()); if (openProject(d, f.name)) return; importVariants(d); }
+  catch (err) { toast('Import fehlgeschlagen: ' + err.message); }
 });
 let jspdfP = null;
 function loadJsPDF() {
+  if (window.jspdf?.jsPDF) return Promise.resolve(window.jspdf.jsPDF);
   return jspdfP ??= new Promise((res, rej) => {
     const s = document.createElement('script'); s.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
     s.onload = () => res(window.jspdf.jsPDF); s.onerror = () => { jspdfP = null; rej(new Error('PDF-Bibliothek nicht geladen')); }; document.head.appendChild(s);
@@ -1206,7 +1227,7 @@ async function init3D() {
   const scene = new THREE.Scene();
   const dark = getComputedStyle(document.documentElement).getPropertyValue('--sheet').trim().startsWith('#1');
   scene.background = new THREE.Color(dark ? 0x1b2126 : 0xe8ecef);
-  const camera = new THREE.PerspectiveCamera(50, 1, .05, 200);
+  const camera = new THREE.PerspectiveCamera(60, 1, .05, 200);
   const orbit = new OrbitControls(camera, canvas); orbit.enableDamping = true; orbit.dampingFactor = .12; orbit.maxPolarAngle = Math.PI * .495;
   const R = S.R, b = R.bounds, cx = (b.x0 + b.x1) / 2, cz = (b.y0 + b.y1) / 2, span = Math.max(b.x1 - b.x0, b.y1 - b.y0);
   scene.add(new THREE.HemisphereLight(0xffffff, 0xb9b2a6, 1.15));
@@ -1313,8 +1334,12 @@ async function init3D() {
   }
   $('#views3d').innerHTML = `<button class="chip" data-view="top">Draufsicht</button><button class="chip" data-view="sw">Ecke Südwest</button><button class="chip" data-view="no">Ecke Nordost</button>` +
     R.openings.filter(o => o.typ === 'tuer').map((o, i) => `<button class="chip" data-view="door${i}">Tür ${esc(o.id.replace(/^t-/, ''))}</button>`).join('') +
-    `<button class="chip" id="btnCut" aria-pressed="false">Wände 1,2 m</button><button class="chip" id="btnWalk" aria-pressed="false">Begehen</button>`;
-  $('#views3d').addEventListener('click', e => {
+    `<button class="chip" id="btnCut" aria-pressed="false">Wände 1,2 m</button><button class="chip" id="btnWalk" aria-pressed="false">Begehen</button>` +
+    `<label class="chip" title="Blickwinkel: Tele (schmal) bis Weitwinkel (breit)">Blickwinkel <input type="range" id="fov" min="30" max="100" step="1" value="60" aria-label="Blickwinkel in Grad"> <span id="fovv">60°</span></label>`;
+  const setFov = v => { camera.fov = Math.max(30, Math.min(100, v)); camera.updateProjectionMatrix(); $('#fov').value = Math.round(camera.fov); $('#fovv').textContent = Math.round(camera.fov) + '°'; render(); };
+  $('#fov').oninput = e => setFov(+e.target.value);
+  canvas.addEventListener('wheel', e => { if (!walk) return; e.preventDefault(); setFov(camera.fov + e.deltaY * .04); }, { passive: false });
+  $('#views3d').onclick = (e => {
     const v = e.target.closest('[data-view]'); if (v) goView(v.dataset.view);
     if (e.target.id === 'btnCut') { wallsCut = !wallsCut; e.target.setAttribute('aria-pressed', wallsCut); buildRoom(); }
     if (e.target.id === 'btnWalk') setWalk(!walk);
@@ -1342,7 +1367,7 @@ async function init3D() {
   }
   function setWalk(on, keepPos = false) {
     walk = on; orbit.enabled = !on; $('#walkpad').hidden = !on; $('#btnWalk')?.setAttribute('aria-pressed', on);
-    $('#hint3d').textContent = on ? 'Doppelklick auf den Boden: dorthin gehen · Ziehen: umsehen · W A S D / Pfeiltasten' : 'Doppelklick auf den Boden: hineingehen · Ziehen: drehen · Rad / zwei Finger: zoomen · Tippen: Stück wählen';
+    $('#hint3d').textContent = on ? 'Doppelklick auf den Boden: dorthin gehen · Ziehen: umsehen · Rad: Blickwinkel · W A S D / Pfeiltasten' : 'Doppelklick auf den Boden: hineingehen · Ziehen: drehen · Rad / zwei Finger: zoomen · Tippen: Stück wählen';
     if (on) {
       const dir = new THREE.Vector3(); camera.getWorldDirection(dir); yaw = Math.atan2(dir.x, dir.z); pitch = 0;
       if (!keepPos && (camera.position.y > 2.2 || camera.position.x < b.x0 || camera.position.x > b.x1 || camera.position.z < b.y0 || camera.position.z > b.y1 || blocked(camera.position.x, camera.position.z))) {
@@ -1355,11 +1380,11 @@ async function init3D() {
   }
   function applyLook() { const d = new THREE.Vector3(Math.sin(yaw) * Math.cos(pitch), Math.sin(pitch), Math.cos(yaw) * Math.cos(pitch)); camera.lookAt(camera.position.clone().add(d)); }
   let glide = null;
-  addEventListener('keydown', e => { if (walk && !e.target.matches('input,textarea,select') && /^(w|a|s|d|arrowup|arrowdown|arrowleft|arrowright)$/i.test(e.key) && pane.matches(':hover')) { keys.add(e.key.toLowerCase()); e.preventDefault(); render(); } });
+  addEventListener('keydown', e => { if (alive && walk && !e.target.matches('input,textarea,select') && /^(w|a|s|d|arrowup|arrowdown|arrowleft|arrowright)$/i.test(e.key) && pane.matches(':hover')) { keys.add(e.key.toLowerCase()); e.preventDefault(); render(); } });
   addEventListener('keyup', e => keys.delete(e.key.toLowerCase()));
-  $('#walkpad').addEventListener('pointerdown', e => { const b = e.target.closest('[data-walk]'); if (!b) return; b.setPointerCapture(e.pointerId); pad.add(b.dataset.walk); render(); });
+  $('#walkpad').onpointerdown = (e => { const b = e.target.closest('[data-walk]'); if (!b) return; b.setPointerCapture(e.pointerId); pad.add(b.dataset.walk); render(); });
   const padUp = e => { const b = e.target.closest('[data-walk]'); if (b) pad.delete(b.dataset.walk); };
-  $('#walkpad').addEventListener('pointerup', padUp); $('#walkpad').addEventListener('pointercancel', padUp);
+  $('#walkpad').onpointerup = padUp; $('#walkpad').onpointercancel = padUp;
 
   // Zeiger im 3D: Stück wählen, Umsehen, Doppeltippen
   const ray = new THREE.Raycaster(); let down = null, lastTap = 0;
@@ -1367,7 +1392,8 @@ async function init3D() {
   canvas.addEventListener('pointerdown', e => { down = { x: e.clientX, y: e.clientY, lx: e.clientX, ly: e.clientY, id: e.pointerId }; if (walk) canvas.setPointerCapture(e.pointerId); });
   canvas.addEventListener('pointermove', e => {
     if (!down || e.pointerId !== down.id || !walk) return;
-    yaw -= (e.clientX - down.lx) * .005; pitch = Math.max(-1.2, Math.min(1.2, pitch - (e.clientY - down.ly) * .005)); down.lx = e.clientX; down.ly = e.clientY; applyLook(); render();
+    // Szene greifen: nach links ziehen dreht nach rechts, nach oben ziehen senkt den Blick
+    yaw += (e.clientX - down.lx) * .005; pitch = Math.max(-1.2, Math.min(1.2, pitch + (e.clientY - down.ly) * .005)); down.lx = e.clientX; down.ly = e.clientY; applyLook(); render();
   });
   canvas.addEventListener('pointerup', e => {
     if (!down || e.pointerId !== down.id) return; const moved = Math.hypot(e.clientX - down.x, e.clientY - down.y) > 5; down = null; if (moved) return;
@@ -1394,7 +1420,9 @@ async function init3D() {
   let needs = true, last = performance.now();
   function render() { needs = true; }
   orbit.addEventListener('change', render);
+  let alive = true;
   function loop(now) {
+    if (!alive) return;
     requestAnimationFrame(loop);
     const dt = Math.min(.05, (now - last) / 1000); last = now;
     if (anim) { anim(); needs = true; }
@@ -1418,23 +1446,100 @@ async function init3D() {
     needs = false; renderer.render(scene, camera);
   }
   function resize() { const r = pane.getBoundingClientRect(); if (!r.width) return; renderer.setSize(r.width, r.height, false); camera.aspect = r.width / r.height; camera.updateProjectionMatrix(); render(); }
-  new ResizeObserver(resize).observe(pane);
+  const ro = new ResizeObserver(resize); ro.observe(pane);
   buildRoom(); resize();
   const [eye, tgt] = views.sw(); camera.position.set(...eye); orbit.target.set(...tgt); orbit.update();
   $('#msg3d').remove(); setWalk(false);
-  three = { sync, resize, render };
+  const dispose = () => { alive = false; ro.disconnect(); renderer.dispose(); setWalk(false); const c2 = canvas.cloneNode(false); canvas.replaceWith(c2); };
+  three = { sync, resize, render, dispose };
   sync(); requestAnimationFrame(loop);
 }
 
-/* ---------- Start ---------- */
+/* ---------- Projekt: Raum + Inventar + Varianten in einer Datei ---------- */
 async function getJSON(path) { const r = await fetch(path, { cache: 'no-cache' }); if (!r.ok) throw new Error(path + ': HTTP ' + r.status); return r.json(); }
+function setModel(raum, kat) {
+  if (!Array.isArray(raum?.waende) || !Array.isArray(kat?.stuecke)) throw new Error('Raum (waende) oder Inventar (stuecke) fehlt');
+  S.raum = raum; S.kat = kat; S.M = G.makeModel(raum, kat); S.byId = S.M.byId; S.R = S.M.R; S.fitted = false;
+  $('#roomName').textContent = `${S.projekt.name} · ${raum.name}`;
+  $('[data-opt="unterlage"]').hidden = !raum.unterlage;
+}
+function reset3D() {
+  three?.dispose(); three = null; threeP = null;
+  if (!$('#msg3d')) $('#pane3d').insertAdjacentHTML('beforeend', '<div id="msg3d">3D-Ansicht wird geladen …</div>');
+  if (S.layout !== '2d') ensure3D();
+}
+function afterModelChange() {
+  S.sel = null; S.undo = []; S.redo = [];
+  renderVarSelect(); renderVinfo(); renderCatalog(); reset3D(); changed(false);
+  requestAnimationFrame(fit);
+}
+// Standardprojekt: im Artifact aus den Begleitdateien, offline aus der eingebetteten Projektdatei
+async function loadDefault() {
+  const el = document.getElementById('imm-default');
+  if (el) { const d = JSON.parse(el.textContent); return { quelle: 'eingebettet', raum: d.raum, kat: d.katalog, varianten: d.varianten || [], id: d.id || 'imm', name: d.name || 'IMM-Räume' }; }
+  try {
+    const [raum, kat] = await Promise.all([getJSON('daten/raum.json'), getJSON('daten/katalog.json')]);
+    let beispiel = null; try { beispiel = await getJSON('daten/beispiel.json'); } catch { }
+    return { quelle: 'artifact', raum, kat, varianten: beispiel ? [beispiel] : [], id: 'imm', name: 'IMM-Räume' };
+  } catch { throw new Error('keine Raumdaten gefunden'); }
+}
+// Ausstehende Speicherungen des bisherigen Projekts sofort erledigen, bevor ein anderes geladen wird
+function flushSaves() { for (const [id, t] of Object.entries(saveTimers)) { clearTimeout(t); delete saveTimers[id]; const v = S.variants[id]; if (v?.dirty) persist(v); } }
+async function goHome() {
+  if (S.unsaved && !goHome.sure) { goHome.sure = true; toast('Ungesicherte Änderungen – nochmals klicken zum Verlassen, oder zuerst speichern'); setTimeout(() => goHome.sure = false, 4000); return; }
+  goHome.sure = false; S.unsaved = false; S.saveState = '';
+  const d = await loadDefault(); flushSaves();
+  S.projekt = { id: d.id, name: d.name, quelle: d.quelle }; S.beispiel = d.varianten[0] || null;
+  S.variants = {}; setModel(d.raum, d.kat);
+  const w = newVariant('Variante A', []); w.localOnly = true; S.curId = w.id; S.store = 'pending';
+  afterModelChange(); connectStore(null);
+}
+function openProject(d, fileName) {
+  if (!String(d.schema || '').startsWith('imm-space/projekt')) return false;
+  const vs = (d.varianten || []).filter(v => Array.isArray(v.platzierungen));
+  flushSaves();
+  S.projekt = { id: d.id || slug(d.name || fileName || 'projekt'), name: d.name || 'Projekt', quelle: 'datei', datei: fileName };
+  setModel(d.raum, d.katalog);
+  S.store = 'datei'; S.unsaved = false; S.saveState = ''; S.variants = {};
+  for (const v of vs) S.variants[v.id || vid()] = { ...structuredClone(v), id: v.id || vid() };
+  if (!vs.length) newVariant('Variante A', []);
+  S.curId = sorted()[0].id; afterModelChange();
+  toast(`Projekt „${S.projekt.name}“ geöffnet: ${vs.length} Varianten`);
+  return true;
+}
+const toDataURL = blob => new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej; r.readAsDataURL(blob); });
+async function embed(src) { if (!src || src.startsWith('data:')) return src; try { const r = await fetch(src); if (!r.ok) return src; return await toDataURL(await r.blob()); } catch { return src; } }
+async function saveProject() {
+  const kat = structuredClone(S.kat), raum = structuredClone(S.raum);
+  for (const st of kat.stuecke) if (st.bild) st.bild = await embed(st.bild);   // Fotos in die Datei, damit sie überall erscheinen
+  if (raum.unterlage?.bild) raum.unterlage.bild = await embed(raum.unterlage.bild);
+  const d = { schema: 'imm-space/projekt@1', id: S.projekt.id, name: S.projekt.name, gespeichert: new Date().toISOString(), programm: 'IMM Raumplaner',
+    raum, katalog: kat, varianten: sorted().filter(v => v.platzierungen.length || v.dirty || !v.localOnly).map(clean) };
+  const name = (S.projekt.datei && S.projekt.datei.endsWith('.imm.json')) ? S.projekt.datei : `${slug(S.projekt.name)}-${new Date().toISOString().slice(0, 10)}.imm.json`;
+  await saveFile(name, JSON.stringify(d, null, 1));
+  if (S.store === 'datei') { S.unsaved = false; renderStatus(); }
+}
+async function openFile(f) {
+  try {
+    const d = JSON.parse(await f.text());
+    if (openProject(d, f.name)) { $$('.ovl').forEach(o => o.remove()); return; }
+    if (Array.isArray(d.platzierungen) || Array.isArray(d.varianten)) { importVariants(d); return; }
+    throw new Error('weder Projektdatei noch Variante');
+  } catch (err) { toast('Öffnen fehlgeschlagen: ' + err.message); }
+}
+$('#fileProject').addEventListener('change', e => { const f = e.target.files[0]; e.target.value = ''; if (f) openFile(f); });
+let dragDepth = 0;
+document.addEventListener('dragenter', e => { if ([...(e.dataTransfer?.types || [])].includes('Files')) { dragDepth++; document.body.classList.add('dropzone'); } });
+document.addEventListener('dragleave', () => { if (--dragDepth <= 0) { dragDepth = 0; document.body.classList.remove('dropzone'); } });
+document.addEventListener('dragover', e => { if ([...(e.dataTransfer?.types || [])].includes('Files')) e.preventDefault(); });
+document.addEventListener('drop', e => { e.preventDefault(); dragDepth = 0; document.body.classList.remove('dropzone'); const f = e.dataTransfer?.files?.[0]; if (f) openFile(f); });
+
+/* ---------- Start ---------- */
 async function start() {
-  let raum, kat;
-  try { [raum, kat] = await Promise.all([getJSON('daten/raum.json'), getJSON('daten/katalog.json')]); }
-  catch (e) { $('#status').textContent = 'Raum- oder Inventardaten fehlen: ' + e.message; return; }
-  try { S.beispiel = await getJSON('daten/beispiel.json'); } catch { }
-  S.raum = raum; S.kat = kat; S.M = G.makeModel(raum, kat); S.byId = S.M.byId; S.R = S.M.R;
-  $('#roomName').textContent = `Institut für Marketing Management · ZHAW · ${raum.name}`;
+  let d;
+  try { d = await loadDefault(); } catch (e) { $('#status').textContent = 'Raum- oder Inventardaten fehlen: ' + e.message; return; }
+  S.projekt = { id: d.id, name: d.name, quelle: d.quelle }; S.defaultSrc = d.quelle; S.defaultName = d.name; S.beispiel = d.varianten[0] || null;
+  setModel(d.raum, d.kat);
   const prefs = loadPrefs();
   if (prefs?.opts) Object.assign(S.opts, prefs.opts);
   renderOpts();
