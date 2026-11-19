@@ -6,6 +6,8 @@ Neugestaltung der Räume des Instituts für Marketing Management (IMM, ZHAW): 2D
 - Hinweis: Das Institut heisst **IMM**, nicht EMM. Ordner und Fundus-Slug werden noch umbenannt (`projects-move` → `26_IMM-Space`).
 
 ## Editor
+- Code öffentlich: https://github.com/falkue/imm-space (ohne Pläne, Fotos, Auftrag – siehe `.gitignore`).
+- Zusammenarbeit mit Claude Code und Fable (Brainstorm, Prüfen, Anzeigen): `ZUSAMMENARBEIT.md`.
 - Live (privat): https://claude.ai/artifact/1ot2JpSnj6C5Nz8rCWyHj8 – „IMM Raumplaner“, läuft im Browser (auch iPad), ohne Installation.
 - Quelle: `app/index.html` (SVG-2D-Editor, three.js 0.160 für 3D, jsPDF für den PDF-Export).
 - Veröffentlicht mit den Daten als Begleitdateien: `daten/raum.json` ← `raum/raeume.json`, `daten/katalog.json` ← `inventar/katalog.json`,
