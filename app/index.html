@@ -198,6 +198,9 @@ textarea.json{width:100%;min-height:260px;font-family:var(--f-mono);font-size:12
 .plan .dim{stroke:var(--dim)} 
 .plan .dimt{fill:var(--dim);stroke:var(--halo);paint-order:stroke;font-family:var(--f-mono)}
 
+.plan .camcone{fill:var(--accent);fill-opacity:.16;stroke:var(--accent);stroke-opacity:.55;stroke-width:.015}
+.plan .camdir{stroke:var(--accent);stroke-linecap:round}
+.plan .camdot{fill:var(--accent);stroke:var(--panel)} .plan .camdot.orbit{fill:var(--panel);stroke:var(--accent)}
 .plan .seldim{stroke:var(--accent)} 
 .plan .seldimt{fill:var(--accent);stroke:var(--halo);paint-order:stroke;font-family:var(--f-mono);font-weight:500}
 .plan [data-act="item"]{cursor:move} .plan [data-act="rot"]{cursor:grab}
@@ -262,6 +265,7 @@ textarea.json{width:100%;min-height:260px;font-family:var(--f-mono);font-size:12
           <button class="chip" data-opt="swing">Türschwenk</button>
           <button class="chip" data-opt="labels">Namen</button>
           <button class="chip" data-opt="snap">Einrasten</button>
+          <button class="chip" data-opt="cam" title="Standort und Blickrichtung der 3D-Ansicht im Plan">Standort</button>
           <button class="chip" id="btnFit">Einpassen</button>
         </div>
         <div id="vinfo" hidden title="Antippen: ganze Begründung"></div>
@@ -652,7 +656,7 @@ const vid = () => 'v' + Date.now().toString(36) + Math.random().toString(36).sli
 const S = {
   raum: null, R: null, kat: null, byId: {},
   variants: {}, curId: null, sel: null,
-  view: { k: 50, tx: 0, ty: 0 }, opts: { grid: true, dims: true, swing: true, labels: true, snap: true, unterlage: true }, projekt: { id: 'imm', name: 'IMM-Räume', quelle: 'artifact' }, unsaved: false,
+  view: { k: 50, tx: 0, ty: 0 }, opts: { grid: true, dims: true, swing: true, labels: true, snap: true, unterlage: true, cam: true }, projekt: { id: 'imm', name: 'IMM-Räume', quelle: 'artifact' }, unsaved: false,
   undo: [], redo: [], hits: new Map(), layout: 'split', dragging: false,
   store: 'pending', saveState: '', storeErr: ''
 };
@@ -681,12 +685,38 @@ function draw() {
   const v = cur(); if (!v || !S.R) return;
   svg.setAttribute('viewBox', `0 0 ${W} ${Hh}`);
   const { k, tx, ty } = S.view, u = 1 / k;
-  svg.innerHTML = `<g transform="translate(${tx} ${ty}) scale(${k})">${renderPlan(v, { u, k, interactive: true, opts: S.opts })}</g>`;
+  svg.innerHTML = `<g transform="translate(${tx} ${ty}) scale(${k})">${renderPlan(v, { u, k, interactive: true, opts: S.opts })}</g><g id="camL" transform="translate(${tx} ${ty}) scale(${k})">${camSVG(u)}</g>`;
   // Massstabsleiste
   const nice = [.5, 1, 2, 5, 10].find(m => m * k > 70) || 10;
   $('#scaleLbl').innerHTML = `<svg width="${nice * k + 2}" height="9" style="vertical-align:middle;margin-right:6px"><rect x="1" y="2" width="${nice * k / 2}" height="5" fill="currentColor"/><rect x="${1 + nice * k / 2}" y="2" width="${nice * k / 2}" height="5" fill="none" stroke="currentColor"/></svg>${num(nice, nice < 1 ? 1 : 0)} m`;
 }
 new ResizeObserver(() => { const r = svg.getBoundingClientRect(); if (!r.width) return; W = r.width; Hh = r.height; if (!S.R) return; if (!S.fitted) { S.fitted = true; fit(); } else draw(); }).observe($('#pane2d'));
+
+/* ---------- Standort der 3D-Ansicht im Plan ---------- */
+// S.cam = {x, y, ang (Blickrichtung im Plan, Bogenmass, null = senkrecht nach unten), hfov (waagrechter Blickwinkel), walk, high}
+function camSVG(u) {
+  const c = S.cam; if (!c || !S.opts.cam || S.layout !== 'split') return '';
+  let out = '';
+  if (c.ang != null) {
+    const L = c.walk ? 3 : 2.2, a0 = c.ang - c.hfov / 2, a1 = c.ang + c.hfov / 2;
+    const P = a => [c.x + Math.cos(a) * L, c.y + Math.sin(a) * L];
+    const [x0, y0] = P(a0), [x1, y1] = P(a1);
+    out += `<path d="M${c.x} ${c.y} L${x0} ${y0} A${L} ${L} 0 0 1 ${x1} ${y1} Z" class="camcone" pointer-events="none"/>`;
+    const [xn, yn] = [c.x + Math.cos(c.ang) * .38, c.y + Math.sin(c.ang) * .38];
+    out += `<line x1="${c.x}" y1="${c.y}" x2="${xn}" y2="${yn}" class="camdir" stroke-width="${3 * u}" pointer-events="none"/>`;
+  }
+  const r = Math.max(.16, 7 * u);
+  out += `<circle cx="${c.x}" cy="${c.y}" r="${r}" class="camdot ${c.walk ? '' : 'orbit'}" stroke-width="${2.2 * u}"/>`;
+  out += `<circle cx="${c.x}" cy="${c.y}" r="${Math.max(r * 2.2, 18 * u)}" fill="transparent" data-act="cam" style="cursor:grab"/>`;
+  return out;
+}
+let camRaf = 0;
+function setCam(c) {
+  const o = S.cam;
+  if (o && c && Math.abs(o.x - c.x) < .01 && Math.abs(o.y - c.y) < .01 && o.walk === c.walk && Math.abs(o.hfov - c.hfov) < .005 && (o.ang == null) === (c.ang == null) && (c.ang == null || Math.abs(o.ang - c.ang) < .005)) return;
+  S.cam = c;
+  if (!camRaf) camRaf = requestAnimationFrame(() => { camRaf = 0; const g = $('#camL'); if (g) g.innerHTML = camSVG(1 / S.view.k); });
+}
 
 /* ---------- Änderungen, Rückgängig ---------- */
 function pushUndo() { S.undo.push(JSON.stringify(cur().platzierungen)); if (S.undo.length > 200) S.undo.shift(); S.redo = []; }
@@ -732,6 +762,7 @@ svg.addEventListener('pointerdown', e => {
     return;
   }
   const t = e.target.closest('[data-act]'), w = toWorld(e.clientX, e.clientY);
+  if (t?.dataset.act === 'cam') { drag = { mode: 'cam', moved: false }; return; }
   if (t?.dataset.act === 'rot') { drag = { mode: 'rot', uid: t.dataset.uid, moved: false }; }
   else if (t?.dataset.act === 'item') {
     const p = cur().platzierungen.find(q => q.uid === t.dataset.uid);
@@ -754,6 +785,7 @@ svg.addEventListener('pointermove', e => {
     if (!drag.moved && Math.hypot(dx, dy) < 4) return;
     drag.moved = true; S.view.tx = drag.tx + dx; S.view.ty = drag.ty + dy; draw(); return;
   }
+  if (drag.mode === 'cam') { drag.moved = true; const w = toWorld(e.clientX, e.clientY); three?.placePerson(w[0], w[1]); return; }
   const p = cur().platzierungen.find(q => q.uid === drag.uid); if (!p) return;
   if (drag.mode === 'move') {
     if (!drag.moved && Math.hypot(e.clientX - drag.start[0], e.clientY - drag.start[1]) < 3) return;
@@ -910,7 +942,7 @@ $('#btnFit').addEventListener('click', fit);
 function setLayout(l) {
   S.layout = l; $('#work').dataset.layout = l;
   for (const b of $$('[data-layout]')) b.setAttribute('aria-pressed', b.dataset.layout === l);
-  savePrefs(); if (l !== '2d') ensure3D();
+  savePrefs(); if (l !== '2d') ensure3D(); draw();
   requestAnimationFrame(() => { if (l !== '3d') fit(); three?.resize(); });
 }
 $$('[data-layout]').forEach(b => b.addEventListener('click', () => setLayout(b.dataset.layout)));
@@ -1444,14 +1476,23 @@ async function init3D() {
     }
     if (!needs || !pane.offsetParent) return;
     needs = false; renderer.render(scene, camera);
+    const d = new THREE.Vector3(); camera.getWorldDirection(d); const hz = Math.hypot(d.x, d.z);
+    setCam({ x: camera.position.x, y: camera.position.z, ang: hz > .15 ? Math.atan2(d.z, d.x) : null,
+      hfov: 2 * Math.atan(Math.tan(camera.fov * Math.PI / 360) * camera.aspect), walk, high: camera.position.y > 2.2 });
   }
   function resize() { const r = pane.getBoundingClientRect(); if (!r.width) return; renderer.setSize(r.width, r.height, false); camera.aspect = r.width / r.height; camera.updateProjectionMatrix(); render(); }
   const ro = new ResizeObserver(resize); ro.observe(pane);
   buildRoom(); resize();
   const [eye, tgt] = views.sw(); camera.position.set(...eye); orbit.target.set(...tgt); orbit.update();
   $('#msg3d').remove(); setWalk(false);
-  const dispose = () => { alive = false; ro.disconnect(); renderer.dispose(); setWalk(false); const c2 = canvas.cloneNode(false); canvas.replaceWith(c2); };
-  three = { sync, resize, render, dispose };
+  // Figur im 2D-Plan gezogen: dorthin stellen (im Begehen-Modus, Blickrichtung bleibt)
+  function placePerson(x, z) {
+    if (blocked(x, z)) return;
+    if (!walk) { const dir = new THREE.Vector3(); camera.getWorldDirection(dir); camera.position.set(x, 1.6, z); setWalk(true, true); if (Math.hypot(dir.x, dir.z) > .15) yaw = Math.atan2(dir.x, dir.z); }
+    camera.position.x = x; camera.position.z = z; camera.position.y = 1.6; glide = null; applyLook(); render();
+  }
+  const dispose = () => { alive = false; setCam(null); ro.disconnect(); renderer.dispose(); setWalk(false); const c2 = canvas.cloneNode(false); canvas.replaceWith(c2); };
+  three = { sync, resize, render, dispose, placePerson };
   sync(); requestAnimationFrame(loop);
 }
 
